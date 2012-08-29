@@ -1,7 +1,6 @@
 = Deadlock Retry
 
-Deadlock retry allows the database adapter (currently only tested with the
-PostgreSQLAdapter) to retry transactions that fall into deadlock. It will retry
+Deadlock retry allows the PostgreSQL adapter to retry transactions that fall into deadlock. It will retry
 such transactions three times before finally failing.
 
 This capability is automatically added to ActiveRecord. No code changes or otherwise are required.
