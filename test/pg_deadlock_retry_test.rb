@@ -9,7 +9,7 @@ puts "Testing ActiveRecord #{ActiveRecord::VERSION::STRING}"
 require 'test/unit'
 require 'mocha'
 require 'logger'
-require "deadlock_retry"
+require "pg_deadlock_retry"
 
 class MockModel
   @@open_transactions = 0
@@ -33,12 +33,8 @@ class MockModel
     @logger ||= Logger.new(nil)
   end
 
-  def self.show_innodb_status
-    []
-  end
-
   def self.select_rows(sql)
-    [['version', '5.1.45']]
+    [['version', '9.1']]
   end
 
   def self.select_value(sql)
@@ -46,14 +42,15 @@ class MockModel
   end
 
   def self.adapter_name
-    "MySQL"
+    "PostgreSQL"
   end
 
-  include DeadlockRetry
+  include PGDeadlockRetry
 end
 
-class DeadlockRetryTest < Test::Unit::TestCase
+class PGDeadlockRetryTest < Test::Unit::TestCase
   DEADLOCK_ERROR = "MySQL::Error: Deadlock found when trying to get lock"
+  PG_SERIALIZE_ERROR = "PG::Error: ERROR: could not serialize access due to concurrent update"
   TIMEOUT_ERROR = "MySQL::Error: Lock wait timeout exceeded"
 
   def setup
@@ -62,6 +59,12 @@ class DeadlockRetryTest < Test::Unit::TestCase
 
   def test_no_errors
     assert_equal :success, MockModel.transaction { :success }
+  end
+
+  def test_no_errors_with_pg_deadlock
+    errors = [ PG_SERIALIZE_ERROR ] * 3
+    assert_equal :success, MockModel.transaction { raise ActiveRecord::StatementInvalid, errors.shift unless errors.empty?; :success }      
+    assert errors.empty?
   end
 
   def test_no_errors_with_deadlock
@@ -91,13 +94,6 @@ class DeadlockRetryTest < Test::Unit::TestCase
   def test_included_by_default
     assert ActiveRecord::Base.respond_to?(:transaction_with_deadlock_handling)
   end
-
-  def test_innodb_status_availability
-    DeadlockRetry.innodb_status_cmd = nil
-    MockModel.transaction {}
-    assert_equal "show innodb status", DeadlockRetry.innodb_status_cmd
-  end
-
 
   def test_error_in_nested_transaction_should_retry_outermost_transaction
     tries = 0
