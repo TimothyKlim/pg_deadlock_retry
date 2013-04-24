@@ -15,7 +15,8 @@ module PGDeadlockRetry
       "Deadlock found when trying to get lock",
       "Lock wait timeout exceeded",
       "deadlock detected",
-      "could not serialize access due to concurrent update"
+      "could not serialize access due to concurrent update",
+      "current transaction is aborted"
     ]
 
     MAXIMUM_RETRIES_ON_DEADLOCK = 3
